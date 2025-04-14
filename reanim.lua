@@ -207,7 +207,7 @@ local function enableVoidWalk()
     local function onCharacterAdded(character)
         local humanoid = character:WaitForChild("Humanoid")
         local hrp = character:WaitForChild("HumanoidRootPart")
-        
+
         humanoid.Changed:Connect(function()
             if humanoid:GetState() == Enum.HumanoidStateType.Physics then
                 hrp.CFrame = CFrame.new(hrp.Position.X, 500, hrp.Position.Z) -- Adjust Y to a high value
