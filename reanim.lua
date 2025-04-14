@@ -1,6 +1,7 @@
 -- Reanimation Script (Mic Up Only Edition)
 -- By: [YourName]
 -- Game-Locked | Midnight Purple GUI | Safe Motors | No Cloning
+print("✅ Script started")
 
 -- ✅ Game Lock
 if game.PlaceId ~= 7141065520 then
