@@ -1,263 +1,225 @@
--- PhantomRig v3.2 - Midnight Purple GUI with Speed Control & Keybind Customization
+-- PhantomRig v3.3 - Universal Reanimation GUI Script
+-- Author: You
+-- Executor: Xeno (tested), others supported
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-
 local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local Mouse = LocalPlayer:GetMouse()
 
-local gui = Instance.new("ScreenGui", PlayerGui)
-gui.Name = "PhantomRigGUI"
-gui.ResetOnSpawn = false
-
+-- State
 local savedAnimations = {}
 local reanimationEnabled = true
 local guiVisible = true
-local animationSpeed = 1
 local toggleKey = Enum.KeyCode.RightShift
+local animationSpeed = 1
 
--- Helper function
-local function roundify(obj, radius)
-	local uic = Instance.new("UICorner")
-	uic.CornerRadius = UDim.new(0, radius)
-	uic.Parent = obj
-end
+-- GUI Construction
+local screenGui = Instance.new("ScreenGui", game.CoreGui)
+screenGui.Name = "PhantomRig"
 
--- Frame
-local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 620, 0, 460)
-frame.Position = UDim2.new(0.5, -310, 0.5, -230)
-frame.BackgroundColor3 = Color3.fromRGB(35, 0, 65)
+local frame = Instance.new("Frame", screenGui)
+frame.Size = UDim2.new(0, 450, 0, 400)
+frame.Position = UDim2.new(0.5, -225, 0.5, -200)
+frame.BackgroundColor3 = Color3.fromRGB(25, 0, 40)
+frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
-roundify(frame, 12)
+frame.Visible = true
 
--- Title Bar
+local UICorner = Instance.new("UICorner", frame)
+UICorner.CornerRadius = UDim.new(0, 12)
+
 local title = Instance.new("TextLabel", frame)
-title.Text = "✦ PhantomRig ✦"
-title.Size = UDim2.new(1, -80, 0, 40)
-title.Position = UDim2.new(0, 0, 0, 0)
+title.Text = "PhantomRig"
+title.Size = UDim2.new(1, 0, 0, 40)
 title.BackgroundTransparency = 1
-title.TextColor3 = Color3.fromRGB(230, 200, 255)
+title.TextColor3 = Color3.new(1, 1, 1)
 title.TextScaled = true
-title.Font = Enum.Font.GothamBold
 
--- Minimize
 local minimizeBtn = Instance.new("TextButton", frame)
-minimizeBtn.Text = "-"
-minimizeBtn.Size = UDim2.new(0, 40, 0, 40)
-minimizeBtn.Position = UDim2.new(1, -40, 0, 0)
-minimizeBtn.BackgroundColor3 = Color3.fromRGB(60, 0, 90)
-minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-minimizeBtn.Font = Enum.Font.GothamBold
-minimizeBtn.TextScaled = true
-roundify(minimizeBtn, 8)
+minimizeBtn.Text = "_"
+minimizeBtn.Size = UDim2.new(0, 40, 0, 30)
+minimizeBtn.Position = UDim2.new(1, -50, 0, 5)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(50, 0, 70)
+minimizeBtn.TextColor3 = Color3.new(1, 1, 1)
+local minCorner = Instance.new("UICorner", minimizeBtn)
+minCorner.CornerRadius = UDim.new(0, 6)
 
--- Settings Button
-local settingsBtn = Instance.new("TextButton", frame)
-settingsBtn.Text = "⚙️"
-settingsBtn.Size = UDim2.new(0, 40, 0, 40)
-settingsBtn.Position = UDim2.new(1, -80, 0, 0)
-settingsBtn.BackgroundColor3 = Color3.fromRGB(50, 0, 80)
-settingsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-settingsBtn.Font = Enum.Font.Gotham
-settingsBtn.TextScaled = true
-roundify(settingsBtn, 8)
-
--- Main Content
 local content = Instance.new("Frame", frame)
-content.Position = UDim2.new(0, 0, 0, 40)
-content.Size = UDim2.new(1, 0, 1, -40)
+content.Position = UDim2.new(0, 10, 0, 50)
+content.Size = UDim2.new(1, -20, 1, -60)
 content.BackgroundTransparency = 1
 
--- Input Fields
+-- Inputs
 local nameInput = Instance.new("TextBox", content)
 nameInput.PlaceholderText = "Reanimations"
-nameInput.Size = UDim2.new(0.45, 0, 0, 40)
-nameInput.Position = UDim2.new(0.05, 0, 0.05, 0)
-nameInput.BackgroundColor3 = Color3.fromRGB(70, 0, 120)
-nameInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-nameInput.Font = Enum.Font.Gotham
-nameInput.TextScaled = true
-roundify(nameInput, 8)
+nameInput.Size = UDim2.new(1, 0, 0, 30)
+nameInput.BackgroundColor3 = Color3.fromRGB(40, 0, 60)
+nameInput.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", nameInput).CornerRadius = UDim.new(0, 6)
 
 local animInput = Instance.new("TextBox", content)
-animInput.PlaceholderText = "Animation ID"
-animInput.Size = UDim2.new(0.45, 0, 0, 40)
-animInput.Position = UDim2.new(0.5, 0, 0.05, 0)
-animInput.BackgroundColor3 = Color3.fromRGB(70, 0, 120)
-animInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-animInput.Font = Enum.Font.Gotham
-animInput.TextScaled = true
-roundify(animInput, 8)
+animInput.PlaceholderText = "Saved"
+animInput.Position = UDim2.new(0, 0, 0, 40)
+animInput.Size = UDim2.new(1, 0, 0, 30)
+animInput.BackgroundColor3 = Color3.fromRGB(40, 0, 60)
+animInput.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", animInput).CornerRadius = UDim.new(0, 6)
 
 local playButton = Instance.new("TextButton", content)
-playButton.Text = "Save & Play"
-playButton.Size = UDim2.new(0.9, 0, 0, 40)
-playButton.Position = UDim2.new(0.05, 0, 0.2, 0)
-playButton.BackgroundColor3 = Color3.fromRGB(110, 0, 150)
+playButton.Text = "💾 Save & Play"
+playButton.Position = UDim2.new(0, 0, 0, 80)
+playButton.Size = UDim2.new(1, 0, 0, 30)
+playButton.BackgroundColor3 = Color3.fromRGB(70, 0, 100)
 playButton.TextColor3 = Color3.new(1, 1, 1)
-playButton.Font = Enum.Font.GothamBold
-playButton.TextScaled = true
-roundify(playButton, 10)
-
-local searchBox = Instance.new("TextBox", content)
-searchBox.PlaceholderText = "Saved"
-searchBox.Size = UDim2.new(0.9, 0, 0, 30)
-searchBox.Position = UDim2.new(0.05, 0, 0.35, 0)
-searchBox.BackgroundColor3 = Color3.fromRGB(40, 0, 60)
-searchBox.TextColor3 = Color3.new(1, 1, 1)
-searchBox.Font = Enum.Font.Gotham
-searchBox.TextScaled = true
-roundify(searchBox, 8)
-
-local dropdown = Instance.new("ScrollingFrame", content)
-dropdown.Size = UDim2.new(0.9, 0, 0.3, 0)
-dropdown.Position = UDim2.new(0.05, 0, 0.45, 0)
-dropdown.BackgroundColor3 = Color3.fromRGB(25, 0, 40)
-dropdown.BorderSizePixel = 0
-dropdown.CanvasSize = UDim2.new(0, 0, 0, 0)
-dropdown.ScrollBarThickness = 6
-roundify(dropdown, 8)
+Instance.new("UICorner", playButton).CornerRadius = UDim.new(0, 6)
 
 local toggleBtn = Instance.new("TextButton", content)
 toggleBtn.Text = "Reanimation: ON"
-toggleBtn.Size = UDim2.new(0.9, 0, 0, 30)
-toggleBtn.Position = UDim2.new(0.05, 0, 0.76, 0)
+toggleBtn.Position = UDim2.new(0, 0, 0, 120)
+toggleBtn.Size = UDim2.new(1, 0, 0, 30)
 toggleBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 120)
 toggleBtn.TextColor3 = Color3.new(1, 1, 1)
-toggleBtn.Font = Enum.Font.GothamBold
-toggleBtn.TextScaled = true
-roundify(toggleBtn, 8)
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 6)
 
 local speedLabel = Instance.new("TextLabel", content)
-speedLabel.Text = "Speed: 1.0x"
-speedLabel.Size = UDim2.new(0.5, 0, 0, 25)
-speedLabel.Position = UDim2.new(0.05, 0, 0.89, 0)
-speedLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
+speedLabel.Text = "Speed: 1x"
+speedLabel.Position = UDim2.new(0, 0, 0, 160)
+speedLabel.Size = UDim2.new(1, 0, 0, 25)
+speedLabel.TextColor3 = Color3.new(1, 1, 1)
 speedLabel.BackgroundTransparency = 1
-speedLabel.TextScaled = true
-speedLabel.Font = Enum.Font.GothamBold
 
-local speedSlider = Instance.new("TextButton", content)
-speedSlider.Size = UDim2.new(0.4, 0, 0, 20)
-speedSlider.Position = UDim2.new(0.5, 0, 0.9, 0)
-speedSlider.BackgroundColor3 = Color3.fromRGB(90, 0, 140)
-speedSlider.Text = ""
-roundify(speedSlider, 8)
+local speedSlider = Instance.new("Frame", content)
+speedSlider.Position = UDim2.new(0, 0, 0, 190)
+speedSlider.Size = UDim2.new(1, 0, 0, 8)
+speedSlider.BackgroundColor3 = Color3.fromRGB(50, 0, 80)
+Instance.new("UICorner", speedSlider).CornerRadius = UDim.new(0, 4)
 
 local fill = Instance.new("Frame", speedSlider)
-fill.BackgroundColor3 = Color3.fromRGB(170, 0, 255)
-fill.Size = UDim2.new(animationSpeed / 2, 0, 1, 0)
-fill.Position = UDim2.new(0, 0, 0, 0)
+fill.Size = UDim2.new(0.5, 0, 1, 0)
+fill.BackgroundColor3 = Color3.fromRGB(120, 0, 180)
 fill.BorderSizePixel = 0
-roundify(fill, 8)
+Instance.new("UICorner", fill).CornerRadius = UDim.new(0, 4)
 
--- Utility: Play animation
-local function playAnimation(id)
-	if not reanimationEnabled then return end
+local searchBox = Instance.new("TextBox", content)
+searchBox.PlaceholderText = "🔍 Search saved..."
+searchBox.Position = UDim2.new(0, 0, 0, 210)
+searchBox.Size = UDim2.new(1, 0, 0, 25)
+searchBox.BackgroundColor3 = Color3.fromRGB(30, 0, 50)
+searchBox.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", searchBox).CornerRadius = UDim.new(0, 6)
+
+local dropdown = Instance.new("ScrollingFrame", content)
+dropdown.Position = UDim2.new(0, 0, 0, 240)
+dropdown.Size = UDim2.new(1, 0, 0, 100)
+dropdown.CanvasSize = UDim2.new(0, 0, 0, 0)
+dropdown.ScrollBarThickness = 4
+dropdown.BackgroundColor3 = Color3.fromRGB(30, 0, 50)
+Instance.new("UICorner", dropdown).CornerRadius = UDim.new(0, 6)
+
+local settingsBtn = Instance.new("TextButton", content)
+settingsBtn.Text = "⚙️"
+settingsBtn.Size = UDim2.new(0, 30, 0, 30)
+settingsBtn.Position = UDim2.new(1, -35, 0, 0)
+settingsBtn.BackgroundColor3 = Color3.fromRGB(50, 0, 70)
+settingsBtn.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", settingsBtn).CornerRadius = UDim.new(0, 6)
+
+local statusLabel = Instance.new("TextLabel", frame)
+statusLabel.Position = UDim2.new(0.05, 0, 0.9, 0)
+statusLabel.Size = UDim2.new(0.9, 0, 0.05, 0)
+statusLabel.BackgroundTransparency = 1
+statusLabel.TextColor3 = Color3.fromRGB(220, 220, 255)
+statusLabel.Text = ""
+statusLabel.TextScaled = true
+
+local testBtn = Instance.new("TextButton", content)
+testBtn.Text = "▶️ Play Test Animation"
+testBtn.Size = UDim2.new(1, 0, 0, 30)
+testBtn.Position = UDim2.new(0, 0, 1, -35)
+testBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 100)
+testBtn.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", testBtn).CornerRadius = UDim.new(0, 6)
+
+-- Function to get Animator
+local function getAnimator()
 	local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if humanoid then
-		local anim = Instance.new("Animation")
-		anim.AnimationId = "rbxassetid://" .. id
-		local track = humanoid:LoadAnimation(anim)
-		track:AdjustSpeed(animationSpeed)
-		track:Play()
+		return humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)
 	end
 end
 
--- Save + play logic
+-- Function to play animation
+local function playAnimation(id)
+	if not reanimationEnabled then return end
+	if not tonumber(id) then
+		statusLabel.Text = "❌ Invalid ID!"
+		return
+	end
+
+	local animator = getAnimator()
+	if not animator then
+		statusLabel.Text = "❌ Animator not found!"
+		return
+	end
+
+	local anim = Instance.new("Animation")
+	anim.AnimationId = "rbxassetid://" .. tostring(id)
+
+	local success, track = pcall(function()
+		return animator:LoadAnimation(anim)
+	end)
+
+	if success and track then
+		track:AdjustSpeed(animationSpeed)
+		track:Play()
+		statusLabel.Text = "✅ Playing animation!"
+	else
+		statusLabel.Text = "❌ Failed to load animation!"
+	end
+end
+
+-- GUI Event Listeners
 playButton.MouseButton1Click:Connect(function()
-	local animName = nameInput.Text
-	local animID = animInput.Text
-
-	if animName ~= "" and animID ~= "" then
-		savedAnimations[animName] = animID
-
-		local button = Instance.new("TextButton", dropdown)
-		button.Size = UDim2.new(1, 0, 0, 25)
-		button.Text = animName
-		button.TextScaled = true
-		button.BackgroundColor3 = Color3.fromRGB(50, 0, 70)
-		button.TextColor3 = Color3.new(1, 1, 1)
-		roundify(button, 6)
-
-		button.MouseButton1Click:Connect(function()
-			playAnimation(savedAnimations[animName])
-		end)
-
-		dropdown.CanvasSize = UDim2.new(0, 0, 0, #dropdown:GetChildren() * 30)
-		playAnimation(animID)
+	local name = nameInput.Text
+	local id = animInput.Text
+	if name ~= "" and id ~= "" then
+		savedAnimations[name] = id
+		playAnimation(id)
 	end
 end)
 
--- Toggle button
 toggleBtn.MouseButton1Click:Connect(function()
 	reanimationEnabled = not reanimationEnabled
 	toggleBtn.Text = "Reanimation: " .. (reanimationEnabled and "ON" or "OFF")
-	toggleBtn.BackgroundColor3 = reanimationEnabled and Color3.fromRGB(80, 0, 120) or Color3.fromRGB(40, 0, 50)
 end)
 
--- GUI toggle key
-UIS.InputBegan:Connect(function(input, gp)
-	if gp then return end
-	if input.KeyCode == toggleKey then
+testBtn.MouseButton1Click:Connect(function()
+	playAnimation("507771019")
+end)
+
+minimizeBtn.MouseButton1Click:Connect(function()
+	content.Visible = not content.Visible
+end)
+
+UIS.InputBegan:Connect(function(input, gpe)
+	if not gpe and input.KeyCode == toggleKey then
 		guiVisible = not guiVisible
-		frame.Visible = guiVisible
+		screenGui.Enabled = guiVisible
 	end
 end)
 
--- Minimize
-local minimized = false
-minimizeBtn.MouseButton1Click:Connect(function()
-	minimized = not minimized
-	content.Visible = not minimized
-end)
-
--- Speed slider logic
-local dragging = false
 speedSlider.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = true
+		speedSlider.InputChanged:Connect(function(moveInput)
+			if moveInput.UserInputType == Enum.UserInputType.MouseMovement then
+				local pos = math.clamp((Mouse.X - speedSlider.AbsolutePosition.X) / speedSlider.AbsoluteSize.X, 0, 1)
+				fill.Size = UDim2.new(pos, 0, 1, 0)
+				animationSpeed = math.round(pos * 19 + 1) / 10
+				speedLabel.Text = "Speed: " .. animationSpeed .. "x"
+			end
+		end)
 	end
-end)
-
-UIS.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = false
-	end
-end)
-
-UIS.InputChanged:Connect(function(input)
-	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-		local x = math.clamp((input.Position.X - speedSlider.AbsolutePosition.X) / speedSlider.AbsoluteSize.X, 0, 1)
-		animationSpeed = math.round((x * 1.9 + 0.1) * 10) / 10
-		fill.Size = UDim2.new(x, 0, 1, 0)
-		speedLabel.Text = "Speed: " .. animationSpeed .. "x"
-	end
-end)
-
--- Search Box (live filter)
-searchBox:GetPropertyChangedSignal("Text"):Connect(function()
-	local query = searchBox.Text:lower()
-	for _, btn in ipairs(dropdown:GetChildren()) do
-		if btn:IsA("TextButton") then
-			btn.Visible = btn.Text:lower():find(query) ~= nil
-		end
-	end
-end)
-
--- Settings - keybind rebinder
-settingsBtn.MouseButton1Click:Connect(function()
-	settingsBtn.Text = "Press a key..."
-	local conn
-	conn = UIS.InputBegan:Connect(function(input, gp)
-		if not gp then
-			toggleKey = input.KeyCode
-			settingsBtn.Text = "⚙️"
-			conn:Disconnect()
-		end
-	end)
 end)
