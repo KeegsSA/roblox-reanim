@@ -1,4 +1,4 @@
--- PhantomRig v3.3 - Universal Reanimation GUI Script
+-- PhantomRig v3.4 - Updated Reanimation GUI Script
 -- Author: You
 -- Executor: Xeno (tested), others supported
 
@@ -9,6 +9,7 @@ local Mouse = LocalPlayer:GetMouse()
 
 -- State
 local savedAnimations = {}
+local playingTracks = {}
 local reanimationEnabled = true
 local guiVisible = true
 local toggleKey = Enum.KeyCode.RightShift
@@ -19,8 +20,8 @@ local screenGui = Instance.new("ScreenGui", game.CoreGui)
 screenGui.Name = "PhantomRig"
 
 local frame = Instance.new("Frame", screenGui)
-frame.Size = UDim2.new(0, 450, 0, 400)
-frame.Position = UDim2.new(0.5, -225, 0.5, -200)
+frame.Size = UDim2.new(0, 500, 0, 450)
+frame.Position = UDim2.new(0.5, -250, 0.5, -225)
 frame.BackgroundColor3 = Color3.fromRGB(25, 0, 40)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -43,15 +44,13 @@ minimizeBtn.Size = UDim2.new(0, 40, 0, 30)
 minimizeBtn.Position = UDim2.new(1, -50, 0, 5)
 minimizeBtn.BackgroundColor3 = Color3.fromRGB(50, 0, 70)
 minimizeBtn.TextColor3 = Color3.new(1, 1, 1)
-local minCorner = Instance.new("UICorner", minimizeBtn)
-minCorner.CornerRadius = UDim.new(0, 6)
+Instance.new("UICorner", minimizeBtn).CornerRadius = UDim.new(0, 6)
 
 local content = Instance.new("Frame", frame)
 content.Position = UDim2.new(0, 10, 0, 50)
 content.Size = UDim2.new(1, -20, 1, -60)
 content.BackgroundTransparency = 1
 
--- Inputs
 local nameInput = Instance.new("TextBox", content)
 nameInput.PlaceholderText = "Reanimations"
 nameInput.Size = UDim2.new(1, 0, 0, 30)
@@ -118,31 +117,6 @@ dropdown.ScrollBarThickness = 4
 dropdown.BackgroundColor3 = Color3.fromRGB(30, 0, 50)
 Instance.new("UICorner", dropdown).CornerRadius = UDim.new(0, 6)
 
-local settingsBtn = Instance.new("TextButton", content)
-settingsBtn.Text = "⚙️"
-settingsBtn.Size = UDim2.new(0, 30, 0, 30)
-settingsBtn.Position = UDim2.new(1, -35, 0, 0)
-settingsBtn.BackgroundColor3 = Color3.fromRGB(50, 0, 70)
-settingsBtn.TextColor3 = Color3.new(1, 1, 1)
-Instance.new("UICorner", settingsBtn).CornerRadius = UDim.new(0, 6)
-
-local statusLabel = Instance.new("TextLabel", frame)
-statusLabel.Position = UDim2.new(0.05, 0, 0.9, 0)
-statusLabel.Size = UDim2.new(0.9, 0, 0.05, 0)
-statusLabel.BackgroundTransparency = 1
-statusLabel.TextColor3 = Color3.fromRGB(220, 220, 255)
-statusLabel.Text = ""
-statusLabel.TextScaled = true
-
-local testBtn = Instance.new("TextButton", content)
-testBtn.Text = "▶️ Play Test Animation"
-testBtn.Size = UDim2.new(1, 0, 0, 30)
-testBtn.Position = UDim2.new(0, 0, 1, -35)
-testBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 100)
-testBtn.TextColor3 = Color3.new(1, 1, 1)
-Instance.new("UICorner", testBtn).CornerRadius = UDim.new(0, 6)
-
--- Function to get Animator
 local function getAnimator()
 	local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -151,19 +125,23 @@ local function getAnimator()
 	end
 end
 
--- Function to play animation
+local function stopAnimation(id)
+	for _, track in pairs(playingTracks) do
+		if track.Animation and track.Animation.AnimationId == ("rbxassetid://" .. id) then
+			track:Stop()
+			playingTracks[track] = nil
+		end
+	end
+end
+
 local function playAnimation(id)
 	if not reanimationEnabled then return end
 	if not tonumber(id) then
-		statusLabel.Text = "❌ Invalid ID!"
 		return
 	end
 
 	local animator = getAnimator()
-	if not animator then
-		statusLabel.Text = "❌ Animator not found!"
-		return
-	end
+	if not animator then return end
 
 	local anim = Instance.new("Animation")
 	anim.AnimationId = "rbxassetid://" .. tostring(id)
@@ -173,15 +151,18 @@ local function playAnimation(id)
 	end)
 
 	if success and track then
-		track:AdjustSpeed(animationSpeed)
-		track:Play()
-		statusLabel.Text = "✅ Playing animation!"
-	else
-		statusLabel.Text = "❌ Failed to load animation!"
+		-- Stop if playing, else play
+		if playingTracks[track] then
+			track:Stop()
+			playingTracks[track] = nil
+		else
+			track:AdjustSpeed(animationSpeed)
+			track:Play()
+			playingTracks[track] = true
+		end
 	end
 end
 
--- GUI Event Listeners
 playButton.MouseButton1Click:Connect(function()
 	local name = nameInput.Text
 	local id = animInput.Text
@@ -194,10 +175,6 @@ end)
 toggleBtn.MouseButton1Click:Connect(function()
 	reanimationEnabled = not reanimationEnabled
 	toggleBtn.Text = "Reanimation: " .. (reanimationEnabled and "ON" or "OFF")
-end)
-
-testBtn.MouseButton1Click:Connect(function()
-	playAnimation("507771019")
 end)
 
 minimizeBtn.MouseButton1Click:Connect(function()
@@ -223,3 +200,5 @@ speedSlider.InputBegan:Connect(function(input)
 		end)
 	end
 end)
+
+-- Future: add search filtering dropdown code
