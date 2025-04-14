@@ -1,6 +1,14 @@
--- Roblox Reanimation System [Safe + UI v2]
--- Fixed: No Reset | WASD Control | Dropdown Save System
+-- Reanimation Script (Mic Up Only Edition)
+-- By: [YourName]
+-- Game-Locked | Midnight Purple GUI | Safe Motors | No Cloning
 
+-- ✅ Game Lock
+if game.PlaceId ~= 7141065520 then
+    warn("This script only runs in Mic Up.")
+    return
+end
+
+-- ✅ Services
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
@@ -12,21 +20,23 @@ local char = player.Character or player.CharacterAdded:Wait()
 local hrp = char:WaitForChild("HumanoidRootPart")
 local hum = char:WaitForChild("Humanoid")
 
+-- ✅ Safe Defaults
 local SAVE_PATH = "reanim_ids.txt"
 local reanimIDs = {}
 
--- 🔄 Load Save File
+-- Try to load saved IDs
 pcall(function()
-	local data = readfile(SAVE_PATH)
-	reanimIDs = HttpService:JSONDecode(data)
+	if isfile(SAVE_PATH) then
+		local data = readfile(SAVE_PATH)
+		reanimIDs = HttpService:JSONDecode(data)
+	end
 end)
 
--- 🔃 Save to File
 local function saveToFile()
 	writefile(SAVE_PATH, HttpService:JSONEncode(reanimIDs))
 end
 
--- 🧲 Reanimation System
+-- ✅ Align Function
 local function alignPart(part, root)
 	local a0 = Instance.new("Attachment", part)
 	local a1 = Instance.new("Attachment", root)
@@ -50,7 +60,7 @@ local function alignPart(part, root)
 	ao.Parent = part
 end
 
--- ✅ Fix: Disable instead of destroy motors
+-- ✅ Disable Motors (safe, non-resetting)
 local function clearMotor6Ds()
 	for _, obj in ipairs(char:GetDescendants()) do
 		if obj:IsA("Motor6D") and obj.Name ~= "RootJoint" then
@@ -60,6 +70,7 @@ local function clearMotor6Ds()
 	end
 end
 
+-- ✅ Main Reanim Root
 local reanimRoot
 local function runReanim()
 	if reanimRoot and reanimRoot.Parent then
@@ -85,7 +96,7 @@ local function runReanim()
 	alignPart(hrp, reanimRoot)
 end
 
--- 🎮 WASD Control
+-- ✅ WASD Control for ReanimRoot
 local moveDir = Vector3.zero
 UserInputService.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.Keyboard then
@@ -95,7 +106,6 @@ UserInputService.InputBegan:Connect(function(input)
 		if input.KeyCode == Enum.KeyCode.D then moveDir += Vector3.new(1, 0, 0) end
 	end
 end)
-
 UserInputService.InputEnded:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.Keyboard then
 		if input.KeyCode == Enum.KeyCode.W then moveDir -= Vector3.new(0, 0, -1) end
@@ -104,7 +114,6 @@ UserInputService.InputEnded:Connect(function(input)
 		if input.KeyCode == Enum.KeyCode.D then moveDir -= Vector3.new(1, 0, 0) end
 	end
 end)
-
 RunService.RenderStepped:Connect(function(dt)
 	if reanimRoot then
 		local move = hrp.CFrame:VectorToWorldSpace(moveDir) * (10 * dt)
@@ -112,18 +121,18 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 end)
 
--- 🟣 GUI Setup
+-- ✅ GUI
 local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 gui.Name = "ReanimGUI"
 
 local frame = Instance.new("Frame", gui)
 frame.Size = UDim2.new(0, 400, 0, 420)
 frame.Position = UDim2.new(0, 20, 0.5, -210)
-frame.BackgroundColor3 = Color3.fromRGB(32, 0, 64) -- Midnight purple
+frame.BackgroundColor3 = Color3.fromRGB(32, 0, 64)
 frame.BorderSizePixel = 0
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 
--- Draggable
+-- Drag
 local dragging, dragStart, startPos
 frame.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -145,54 +154,41 @@ UserInputService.InputEnded:Connect(function(input)
 	end
 end)
 
--- Title Label
+-- UI Labels/Boxes
 local label = Instance.new("TextLabel", frame)
 label.Size = UDim2.new(1, 0, 0, 30)
-label.Position = UDim2.new(0, 0, 0, 0)
-label.Text = "🧍 Reanim System"
-label.TextColor3 = Color3.new(1, 1, 1)
+label.Text = "🧍 Reanimation GUI (Mic Up Only)"
 label.Font = Enum.Font.GothamBold
+label.TextColor3 = Color3.new(1, 1, 1)
 label.TextSize = 18
 label.BackgroundTransparency = 1
 
--- Input Box for New ID
 local idBox = Instance.new("TextBox", frame)
 idBox.Size = UDim2.new(0.8, 0, 0, 30)
 idBox.Position = UDim2.new(0.1, 0, 0, 40)
-idBox.PlaceholderText = "Enter new reanimation name"
+idBox.PlaceholderText = "Enter name to save"
 idBox.Font = Enum.Font.Gotham
 idBox.TextColor3 = Color3.new(1, 1, 1)
 idBox.BackgroundColor3 = Color3.fromRGB(70, 20, 120)
 Instance.new("UICorner", idBox).CornerRadius = UDim.new(0, 6)
 
--- Dropdown Menu
-local dropLabel = Instance.new("TextLabel", frame)
-dropLabel.Size = UDim2.new(0.8, 0, 0, 20)
-dropLabel.Position = UDim2.new(0.1, 0, 0, 80)
-dropLabel.Text = "Select Saved Reanimation:"
-dropLabel.TextColor3 = Color3.new(1, 1, 1)
-dropLabel.Font = Enum.Font.Gotham
-dropLabel.TextSize = 14
-dropLabel.BackgroundTransparency = 1
-
 local dropdown = Instance.new("TextButton", frame)
 dropdown.Size = UDim2.new(0.8, 0, 0, 30)
-dropdown.Position = UDim2.new(0.1, 0, 0, 110)
+dropdown.Position = UDim2.new(0.1, 0, 0, 90)
 dropdown.BackgroundColor3 = Color3.fromRGB(100, 40, 160)
 dropdown.TextColor3 = Color3.new(1, 1, 1)
 dropdown.Font = Enum.Font.Gotham
 dropdown.TextSize = 14
-dropdown.Text = "Select Animation"
+dropdown.Text = "Select Saved Animation"
 Instance.new("UICorner", dropdown).CornerRadius = UDim.new(0, 6)
 
 local selectedID = nil
 dropdown.MouseButton1Click:Connect(function()
 	local menu = Instance.new("Frame", frame)
 	menu.Size = UDim2.new(0.8, 0, 0, 150)
-	menu.Position = UDim2.new(0.1, 0, 0, 150)
+	menu.Position = UDim2.new(0.1, 0, 0, 130)
 	menu.BackgroundColor3 = Color3.fromRGB(50, 20, 80)
 	menu.ZIndex = 5
-	menu.ClipsDescendants = true
 	Instance.new("UICorner", menu).CornerRadius = UDim.new(0, 6)
 
 	for idName, _ in pairs(reanimIDs) do
@@ -213,7 +209,6 @@ dropdown.MouseButton1Click:Connect(function()
 	end
 end)
 
--- Utility: Make Button
 local function createButton(text, yOffset, callback)
 	local btn = Instance.new("TextButton", frame)
 	btn.Size = UDim2.new(0.8, 0, 0, 30)
@@ -227,13 +222,13 @@ local function createButton(text, yOffset, callback)
 	btn.MouseButton1Click:Connect(callback)
 end
 
-createButton("▶ Reanimate", 310, function()
+createButton("▶ Reanimate", 290, function()
 	if selectedID then
 		runReanim()
 	end
 end)
 
-createButton("💾 Save New ID", 350, function()
+createButton("💾 Save ID", 330, function()
 	local id = idBox.Text
 	if id and id ~= "" then
 		reanimIDs[id] = true
@@ -241,6 +236,6 @@ createButton("💾 Save New ID", 350, function()
 	end
 end)
 
-createButton("❌ Close GUI", 390, function()
+createButton("❌ Close", 370, function()
 	gui:Destroy()
 end)
