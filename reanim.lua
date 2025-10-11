@@ -1,25 +1,46 @@
--- PhantomRig v3.7 - Universal Reanimation GUI Script with Tabbed Layout
--- Author: You
--- Executor: Xeno (tested), others supported
-
+-- PhantomRig (uses Reanimation API)
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
-local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 
+-- Try to get the reanimation API from common places
+local ReanimAPI
+local function try_get_api()
+    -- try ReplicatedStorage ModuleScript named "ReanimateAPI"
+    local mod = ReplicatedStorage:FindFirstChild("ReanimateAPI")
+    if mod and mod:IsA("ModuleScript") then
+        local ok, result = pcall(require, mod)
+        if ok and type(result) == "table" then
+            return result
+        end
+    end
+    -- try _G
+    if _G and type(_G.ReanimateAPI) == "table" then
+        return _G.ReanimateAPI
+    end
+    -- try global variable API (if the user inserted it in same env)
+    if type(API) == "table" then
+        return API
+    end
+    return nil
+end
+
+ReanimAPI = try_get_api()
+
 -- State
-local savedAnimations = {}
-local playingTracks = {}
+local savedAnimations = {} -- { {name=..., url=...}, ... }
 local reanimationEnabled = true
 local guiVisible = true
 local toggleKey = Enum.KeyCode.RightShift
 local guiToggleKey = Enum.KeyCode.F1
 local animationSpeed = 1
-local selectedTarget = nil
+local selectedAnimIndex = nil
 local voidWalkEnabled = true -- Automatically enable Void Walk
 
--- GUI Construction
+-- GUI Construction (kept structure from your original)
 local screenGui = Instance.new("ScreenGui", game.CoreGui)
 screenGui.Name = "PhantomRig"
 
@@ -61,7 +82,7 @@ content.Position = UDim2.new(0, 140, 0, 50)
 content.Size = UDim2.new(1, -150, 1, -60)
 content.BackgroundTransparency = 1
 
--- Create pages
+-- Pages
 local pages = {}
 local function createPage(name)
     local page = Instance.new("Frame", content)
@@ -76,7 +97,6 @@ end
 local reanimPage = createPage("Reanimation")
 local targetPage = createPage("Target")
 
--- Tab switching logic
 local function showPage(name)
     for n, page in pairs(pages) do
         page.Visible = (n == name)
@@ -97,20 +117,18 @@ end
 
 createSideButton("🎯 Target", 10, function() showPage("Target") end)
 createSideButton("💃 Reanim", 50, function() showPage("Reanimation") end)
-
--- Default to Reanimation
 showPage("Reanimation")
 
 -- Reanimation Page Elements
 local nameInput = Instance.new("TextBox", reanimPage)
-nameInput.PlaceholderText = "Reanimations"
+nameInput.PlaceholderText = "Name (optional)"
 nameInput.Size = UDim2.new(1, 0, 0, 30)
 nameInput.BackgroundColor3 = Color3.fromRGB(50, 0, 75)
 nameInput.TextColor3 = Color3.new(1, 1, 1)
 Instance.new("UICorner", nameInput).CornerRadius = UDim.new(0, 6)
 
 local animInput = Instance.new("TextBox", reanimPage)
-animInput.PlaceholderText = "Saved"
+animInput.PlaceholderText = "Animation URL (keyframe script)"
 animInput.Position = UDim2.new(0, 0, 0, 40)
 animInput.Size = UDim2.new(1, 0, 0, 30)
 animInput.BackgroundColor3 = Color3.fromRGB(50, 0, 75)
@@ -202,7 +220,274 @@ standBtn.BackgroundColor3 = Color3.fromRGB(120, 0, 160)
 standBtn.TextColor3 = Color3.new(1, 1, 1)
 Instance.new("UICorner", standBtn).CornerRadius = UDim.new(0, 6)
 
--- Enable Void Walk Automatically
+-- Status Label
+local statusLabel = Instance.new("TextLabel", frame)
+statusLabel.Position = UDim2.new(0.05, 0, 0.92, 0)
+statusLabel.Size = UDim2.new(0.9, 0, 0.05, 0)
+statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = ""
+statusLabel.TextScaled = true
+statusLabel.TextAlignment = Enum.TextAlignment.Center
+
+if not ReanimAPI then
+    statusLabel.Text = "Reanimation API not found. Put ModuleScript named 'ReanimateAPI' in ReplicatedStorage or set global API."
+end
+
+-- Helpers
+local function updateDropdown(filter)
+    filter = (filter or ""):lower()
+    for _, child in ipairs(dropdown:GetChildren()) do
+        if child:IsA("TextButton") then child:Destroy() end
+    end
+    local y = 0
+    for i, anim in ipairs(savedAnimations) do
+        if filter == "" or (anim.name and anim.name:lower():find(filter)) or (anim.url and anim.url:lower():find(filter)) then
+            local b = Instance.new("TextButton", dropdown)
+            b.Size = UDim2.new(1, -4, 0, 28)
+            b.Position = UDim2.new(0, 2, 0, y)
+            b.Text = (anim.name and (#anim.name > 0) and anim.name) or anim.url
+            b.BackgroundTransparency = 0.9
+            b.TextColor3 = Color3.new(1,1,1)
+            b.AnchorPoint = Vector2.new(0,0)
+            b.MouseButton1Click:Connect(function()
+                selectedAnimIndex = i
+                -- highlight selection
+                for _, ch in ipairs(dropdown:GetChildren()) do
+                    if ch:IsA("TextButton") then
+                        ch.BackgroundColor3 = Color3.fromRGB(40,0,60)
+                    end
+                end
+                b.BackgroundColor3 = Color3.fromRGB(80,0,120)
+            end)
+            y = y + 30
+        end
+    end
+    dropdown.CanvasSize = UDim2.new(0, 0, 0, y)
+end
+
+-- Speed slider interaction
+local dragging = false
+speedSlider.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+    end
+end)
+speedSlider.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+RunService.Heartbeat:Connect(function()
+    if dragging then
+        local mouseX = UIS:GetMouseLocation().X
+        local guiPos = speedSlider.AbsolutePosition.X
+        local guiSize = speedSlider.AbsoluteSize.X
+        local relative = math.clamp((mouseX - guiPos) / guiSize, 0, 1)
+        fill.Size = UDim2.new(relative, 0, 1, 0)
+        local newSpeed = math.floor((relative * 20) + 1) / 10 -- map to 0.1 to 2.1 roughly
+        animationSpeed = math.clamp(newSpeed, 0.1, 2)
+        speedLabel.Text = ("Speed: %.1fx"):format(animationSpeed)
+        if ReanimAPI and ReanimAPI.set_animation_speed then
+            ReanimAPI.set_animation_speed(animationSpeed)
+        end
+    end
+end)
+
+-- Save & Play
+playButton.MouseButton1Click:Connect(function()
+    local url = animInput.Text ~= "" and animInput.Text or (selectedAnimIndex and savedAnimations[selectedAnimIndex] and savedAnimations[selectedAnimIndex].url)
+    if not url or url == "" then
+        statusLabel.Text = "No animation URL provided or selected."
+        return
+    end
+    local name = nameInput.Text
+    -- save to list
+    table.insert(savedAnimations, {name = name or "", url = url})
+    updateDropdown(searchBox.Text)
+    -- ensure API available
+    ReanimAPI = ReanimAPI or try_get_api()
+    if not ReanimAPI then
+        statusLabel.Text = "Reanimation API not found."
+        return
+    end
+    -- ensure reanimated
+    if not ReanimAPI.is_reanimated or not ReanimAPI.is_reanimated() then
+        local ok, err = pcall(function() ReanimAPI.reanimate(true) end)
+        if not ok then
+            statusLabel.Text = "Reanimate failed: " .. tostring(err)
+            return
+        end
+    end
+    -- set speed and play
+    if ReanimAPI.set_animation_speed then ReanimAPI.set_animation_speed(animationSpeed) end
+    local ok, err = pcall(function() ReanimAPI.play_animation(url, animationSpeed) end)
+    if not ok then
+        statusLabel.Text = "Play failed: " .. tostring(err)
+        return
+    end
+    statusLabel.Text = "Playing animation."
+end)
+
+-- Toggle reanimation
+local function updateToggleText()
+    if ReanimAPI and ReanimAPI.is_reanimated and ReanimAPI.is_reanimated() then
+        toggleBtn.Text = "Reanimation: ON"
+    else
+        toggleBtn.Text = "Reanimation: OFF"
+    end
+end
+
+toggleBtn.MouseButton1Click:Connect(function()
+    ReanimAPI = ReanimAPI or try_get_api()
+    if not ReanimAPI then
+        statusLabel.Text = "Reanimation API not found."
+        return
+    end
+    if ReanimAPI.is_reanimated and ReanimAPI.is_reanimated() then
+        pcall(function() ReanimAPI.reanimate(false) end)
+        statusLabel.Text = "Reanimation disabled."
+    else
+        pcall(function() ReanimAPI.reanimate(true) end)
+        statusLabel.Text = "Reanimation enabled."
+    end
+    updateToggleText()
+end)
+
+-- minimize / restore
+local minimized = false
+minimizeBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    content.Visible = not minimized
+    sidePanel.Visible = not minimized
+    frame.Size = minimized and UDim2.new(0, 200, 0, 60) or UDim2.new(0, 650, 0, 500)
+end)
+
+-- search
+searchBox.Changed:Connect(function()
+    updateDropdown(searchBox.Text)
+end)
+
+-- GUI toggle key
+UIS.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == guiToggleKey then
+        guiVisible = not guiVisible
+        screenGui.Enabled = guiVisible
+    elseif input.KeyCode == toggleKey then
+        -- toggle reanimate quickly
+        ReanimAPI = ReanimAPI or try_get_api()
+        if ReanimAPI and ReanimAPI.is_reanimated and ReanimAPI.reanimate then
+            if ReanimAPI.is_reanimated() then
+                pcall(function() ReanimAPI.reanimate(false) end)
+            else
+                pcall(function() ReanimAPI.reanimate(true) end)
+            end
+            updateToggleText()
+        else
+            statusLabel.Text = "Reanimation API not available."
+        end
+    end
+end)
+
+-- Target actions
+local function getPlayerByNamePart(namePart)
+    if not namePart or namePart == "" then return nil end
+    namePart = namePart:lower()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p.Name:lower():find(namePart) or (p.DisplayName and p.DisplayName:lower():find(namePart)) then
+            return p
+        end
+    end
+    return nil
+end
+
+local function moveCloneToTarget(targetPlayer, offsetCFrame)
+    ReanimAPI = ReanimAPI or try_get_api()
+    if not ReanimAPI then
+        statusLabel.Text = "Reanimation API not found."
+        return
+    end
+    local clone = ReanimAPI.get_clone and ReanimAPI.get_clone()
+    if not clone or not clone.Parent then
+        statusLabel.Text = "Clone not available. Reanimate first."
+        return
+    end
+    local targetChar = targetPlayer.Character
+    if not targetChar or not targetChar.Parent then
+        statusLabel.Text = "Target has no character."
+        return
+    end
+    local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
+    local cloneHRP = clone:FindFirstChild("HumanoidRootPart")
+    if not targetHRP or not cloneHRP then
+        statusLabel.Text = "HumanoidRootPart missing."
+        return
+    end
+    offsetCFrame = offsetCFrame or CFrame.new(0, 0, 0)
+    -- try to place clone near target, repeated attempt in case reanimation heartbeat adjusts it
+    cloneHRP.CFrame = targetHRP.CFrame * offsetCFrame
+    statusLabel.Text = "Moved clone near target."
+end
+
+headsitBtn.MouseButton1Click:Connect(function()
+    local target = getPlayerByNamePart(targetBox.Text)
+    if not target then
+        statusLabel.Text = "Target not found."
+        return
+    end
+    -- small offset to sit on head
+    moveCloneToTarget(target, CFrame.new(0, 2.2, 0))
+end)
+
+standBtn.MouseButton1Click:Connect(function()
+    local target = getPlayerByNamePart(targetBox.Text)
+    if not target then
+        statusLabel.Text = "Target not found."
+        return
+    end
+    -- stand beside (to the right)
+    moveCloneToTarget(target, CFrame.new(1.2, 0, 0))
+end)
+
+-- Headsit tool (simple: click to pick target under mouse)
+selectToolBtn.MouseButton1Click:Connect(function()
+    statusLabel.Text = "Click a player to select them as target."
+    local conn
+    conn = UIS.InputBegan:Connect(function(input, gp)
+        if gp then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local target = Mouse.Target
+            if target then
+                local char = target:FindFirstAncestorOfClass("Model")
+                if char and Players:GetPlayerFromCharacter(char) then
+                    local p = Players:GetPlayerFromCharacter(char)
+                    targetBox.Text = p.Name
+                    statusLabel.Text = "Selected: " .. p.Name
+                else
+                    statusLabel.Text = "No player under mouse."
+                end
+            else
+                statusLabel.Text = "No target under mouse."
+            end
+            conn:Disconnect()
+        end
+    end)
+end)
+
+-- Keep toggle button text in sync if API callbacks exist
+if ReanimAPI and ReanimAPI.on_animation_play then
+    ReanimAPI.on_animation_play(function(url)
+        statusLabel.Text = "Animation started: " .. tostring(url)
+    end)
+end
+if ReanimAPI and ReanimAPI.on_animation_stop then
+    ReanimAPI.on_animation_stop(function(url)
+        statusLabel.Text = "Animation stopped: " .. tostring(url)
+    end)
+end
+
+-- Auto-enable Void Walk (kept from your original)
 local function enableVoidWalk()
     local function onCharacterAdded(character)
         local humanoid = character:WaitForChild("Humanoid")
@@ -221,15 +506,12 @@ local function enableVoidWalk()
     end
 end
 
--- Automatically enable Void Walk when script runs
-enableVoidWalk()
+if voidWalkEnabled then
+    enableVoidWalk()
+end
 
--- Status Label
-local statusLabel = Instance.new("TextLabel", frame)
-statusLabel.Position = UDim2.new(0.05, 0, 0.92, 0)
-statusLabel.Size = UDim2.new(0.9, 0, 0.05, 0)
-statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-statusLabel.BackgroundTransparency = 1
-statusLabel.Text = "Void Walk is Enabled"
-statusLabel.TextScaled = true
-statusLabel.TextAlignment = Enum.TextAlignment.Center
+-- initialize dropdown
+updateDropdown()
+
+-- initial toggle text
+updateToggleText()
