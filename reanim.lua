@@ -303,7 +303,33 @@ API.get_real_character = function(player)
 	return fbi.real_chars[player]
 end
 
--- ✅ Automatically expose globally for other scripts:
+-- ✅ Safe HTTP wrapper (Solara / Syn / ScriptWare compatible)
+function safe_http_get(url)
+	local ok, result = pcall(function()
+		if syn and syn.request then
+			return syn.request({Url = url, Method = "GET"}).Body
+		elseif http and http.request then
+			return http.request({Url = url, Method = "GET"}).Body
+		elseif request then
+			return request({Url = url, Method = "GET"}).Body
+		else
+			return game:HttpGet(url)
+		end
+	end)
+	if ok and result then
+		return result
+	else
+		warn("⚠️ HTTP fetch failed:", result)
+		return nil
+	end
+end
+
+-- Patch the animation loader to use safe_http_get instead of game:HttpGet
+fbi.animation.safe_http_get = safe_http_get
+
+-- ✅ Expose globally
 _G.API = API
+getgenv().API = API -- add executor global for extra safety
 
 return API
+
