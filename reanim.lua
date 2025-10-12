@@ -1,151 +1,289 @@
--- PhantomRig Lite – Reanimation Only
--- by Keegan (Toihz)
--- Midnight purple theme with rounded UI
+-- Reanimation UI + controller LocalScript
+-- Requires the API you pasted to be available as a table named `API`
+-- If not present, it will try to require ReplicatedStorage.ReanimAPI
 
 local Players = game:GetService("Players")
-local UIS = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
-local player = Players.LocalPlayer
+local LocalPlayer = Players.LocalPlayer
 
---// Reanimation API fetch
-local function getReanimAPI()
-	local mod = ReplicatedStorage:FindFirstChild("ReanimateAPI")
-	if mod and mod:IsA("ModuleScript") then
-		local ok, api = pcall(require, mod)
-		if ok and type(api) == "table" then return api end
-	end
-	if _G.ReanimateAPI and type(_G.ReanimateAPI) == "table" then
-		return _G.ReanimateAPI
-	end
-	if _G.API and type(_G.API) == "table" then
-		return _G.API
-	end
-	if type(API) == "table" then
-		return API
-	end
-	return nil
+-- Try to obtain the API table:
+local API = rawget(_G, "API") -- try global first (in case you paste both scripts together)
+if not API then
+    local ok, mod = pcall(function()
+        local candidate = ReplicatedStorage:FindFirstChild("ReanimAPI")
+        if candidate and candidate:IsA("ModuleScript") then
+            return require(candidate)
+        end
+        return nil
+    end)
+    if ok and mod then
+        API = mod
+    end
 end
 
-local API = getReanimAPI()
+if not API then
+    warn("Reanimation API not found. Place your API in a ModuleScript named 'ReanimAPI' in ReplicatedStorage or expose it as global 'API'.")
+    return
+end
 
---// GUI Setup
-local gui = Instance.new("ScreenGui")
-gui.Name = "PhantomRigLite"
-gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = true
-gui.Parent = game:GetService("CoreGui")
+-- Simple UI creation (ScreenGui)
+local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 400, 0, 180)
-frame.Position = UDim2.new(0.5, -200, 0.5, -90)
-frame.BackgroundColor3 = Color3.fromRGB(25, 0, 40)
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ReanimUI"
+screenGui.IgnoreGuiInset = true
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+local frame = Instance.new("Frame")
+frame.Name = "Main"
+frame.Size = UDim2.new(0, 320, 0, 160)
+frame.Position = UDim2.new(0, 12, 0, 80)
+frame.AnchorPoint = Vector2.new(0,0)
+frame.BackgroundTransparency = 0.08
+frame.BackgroundColor3 = Color3.fromRGB(24,24,24)
 frame.BorderSizePixel = 0
-frame.Active = true
-frame.Draggable = true
+frame.Parent = screenGui
+frame.Visible = true
+frame.ClipsDescendants = true
+frame.LayoutOrder = 1
+frame.Padding = UDim.new(0,0)
 
-local corner = Instance.new("UICorner", frame)
-corner.CornerRadius = UDim.new(0, 14)
+local uiCorner = Instance.new("UICorner", frame)
+uiCorner.CornerRadius = UDim.new(0, 8)
 
-local title = Instance.new("TextLabel", frame)
-title.Text = "PhantomRig"
-title.Size = UDim2.new(1, 0, 0, 40)
+local title = Instance.new("TextLabel")
+title.Name = "Title"
+title.Size = UDim2.new(1, -12, 0, 26)
+title.Position = UDim2.new(0, 6, 0, 6)
 title.BackgroundTransparency = 1
-title.TextColor3 = Color3.fromRGB(200, 180, 255)
+title.TextColor3 = Color3.fromRGB(240,240,240)
+title.Text = "Reanimation"
 title.Font = Enum.Font.GothamBold
-title.TextScaled = true
+title.TextSize = 16
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = frame
 
-local minimizeBtn = Instance.new("TextButton", frame)
-minimizeBtn.Text = "_"
-minimizeBtn.Size = UDim2.new(0, 40, 0, 30)
-minimizeBtn.Position = UDim2.new(1, -45, 0, 5)
-minimizeBtn.BackgroundColor3 = Color3.fromRGB(60, 0, 90)
-minimizeBtn.TextColor3 = Color3.new(1, 1, 1)
-minimizeBtn.Font = Enum.Font.GothamBold
-Instance.new("UICorner", minimizeBtn).CornerRadius = UDim.new(0, 6)
+-- Status label
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Name = "Status"
+statusLabel.Size = UDim2.new(1, -12, 0, 18)
+statusLabel.Position = UDim2.new(0, 6, 0, 34)
+statusLabel.BackgroundTransparency = 1
+statusLabel.TextColor3 = Color3.fromRGB(190,190,190)
+statusLabel.Text = "Status: Idle"
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextSize = 14
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.Parent = frame
 
-local reanimBtn = Instance.new("TextButton", frame)
-reanimBtn.Size = UDim2.new(0.8, 0, 0, 45)
-reanimBtn.Position = UDim2.new(0.1, 0, 0.5, -22)
-reanimBtn.Text = "Reanimate: OFF"
-reanimBtn.BackgroundColor3 = Color3.fromRGB(90, 0, 140)
-reanimBtn.TextColor3 = Color3.new(1, 1, 1)
-reanimBtn.Font = Enum.Font.GothamBold
-reanimBtn.TextScaled = true
-Instance.new("UICorner", reanimBtn).CornerRadius = UDim.new(0, 10)
+-- Reanimate Toggle Button
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Name = "ToggleReanimate"
+toggleBtn.Size = UDim2.new(0, 120, 0, 28)
+toggleBtn.Position = UDim2.new(0, 6, 0, 58)
+toggleBtn.BackgroundTransparency = 0
+toggleBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+toggleBtn.TextColor3 = Color3.fromRGB(240,240,240)
+toggleBtn.Text = "Reanimate: Off"
+toggleBtn.Font = Enum.Font.GothamSemibold
+toggleBtn.TextSize = 14
+toggleBtn.AutoButtonColor = true
+toggleBtn.Parent = frame
+local toggleCorner = Instance.new("UICorner", toggleBtn)
+toggleCorner.CornerRadius = UDim.new(0,6)
 
-local status = Instance.new("TextLabel", frame)
-status.Size = UDim2.new(1, 0, 0, 40)
-status.Position = UDim2.new(0, 0, 1, -40)
-status.BackgroundTransparency = 1
-status.TextColor3 = Color3.fromRGB(220, 200, 255)
-status.Font = Enum.Font.Gotham
-status.TextScaled = true
-status.Text = ""
+-- URL TextBox
+local urlBox = Instance.new("TextBox")
+urlBox.Name = "UrlBox"
+urlBox.Size = UDim2.new(1, -138, 0, 28)
+urlBox.Position = UDim2.new(0, 132, 0, 58)
+urlBox.PlaceholderText = "Keyframe script URL (http://...)"
+urlBox.Text = ""
+urlBox.ClearTextOnFocus = false
+urlBox.Font = Enum.Font.Gotham
+urlBox.TextSize = 14
+urlBox.TextColor3 = Color3.fromRGB(230,230,230)
+urlBox.BackgroundColor3 = Color3.fromRGB(32,32,32)
+urlBox.Parent = frame
+local urlCorner = Instance.new("UICorner", urlBox)
+urlCorner.CornerRadius = UDim.new(0,6)
 
---// State
-local minimized = false
-local guiVisible = true
-local toggleKey = Enum.KeyCode.RightShift
+-- Play Button
+local playBtn = Instance.new("TextButton")
+playBtn.Name = "Play"
+playBtn.Size = UDim2.new(0, 92, 0, 28)
+playBtn.Position = UDim2.new(0, 6, 0, 96)
+playBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+playBtn.TextColor3 = Color3.fromRGB(240,240,240)
+playBtn.Text = "Play"
+playBtn.Font = Enum.Font.GothamSemibold
+playBtn.TextSize = 14
+playBtn.Parent = frame
+Instance.new("UICorner", playBtn).CornerRadius = UDim.new(0,6)
 
---// Functions
-local function updateButton()
-	if API and API.is_reanimated and API.is_reanimated() then
-		reanimBtn.Text = "Reanimate: ON"
-		reanimBtn.BackgroundColor3 = Color3.fromRGB(110, 0, 160)
-	else
-		reanimBtn.Text = "Reanimate: OFF"
-		reanimBtn.BackgroundColor3 = Color3.fromRGB(90, 0, 140)
-	end
+-- Stop Button
+local stopBtn = Instance.new("TextButton")
+stopBtn.Name = "Stop"
+stopBtn.Size = UDim2.new(0, 92, 0, 28)
+stopBtn.Position = UDim2.new(0, 106, 0, 96)
+stopBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+stopBtn.TextColor3 = Color3.fromRGB(240,240,240)
+stopBtn.Text = "Stop"
+stopBtn.Font = Enum.Font.GothamSemibold
+stopBtn.TextSize = 14
+stopBtn.Parent = frame
+Instance.new("UICorner", stopBtn).CornerRadius = UDim.new(0,6)
+
+-- Speed Box
+local speedBox = Instance.new("TextBox")
+speedBox.Name = "SpeedBox"
+speedBox.Size = UDim2.new(0, 110, 0, 28)
+speedBox.Position = UDim2.new(0, 206, 0, 96)
+speedBox.PlaceholderText = "Speed (1.0)"
+speedBox.Text = "1.0"
+speedBox.ClearTextOnFocus = false
+speedBox.Font = Enum.Font.Gotham
+speedBox.TextSize = 14
+speedBox.TextColor3 = Color3.fromRGB(230,230,230)
+speedBox.BackgroundColor3 = Color3.fromRGB(32,32,32)
+speedBox.Parent = frame
+Instance.new("UICorner", speedBox).CornerRadius = UDim.new(0,6)
+
+-- Small helper to update status
+local function setStatus(text, warnMode)
+    statusLabel.Text = "Status: " .. tostring(text)
+    if warnMode then
+        statusLabel.TextColor3 = Color3.fromRGB(255,140,120)
+    else
+        statusLabel.TextColor3 = Color3.fromRGB(190,190,190)
+    end
 end
 
-local function setStatus(text)
-	status.Text = text
+-- Keep UI in sync with API state
+local function refreshToggleLabel()
+    local isRe = false
+    local ok, res = pcall(function() return API.is_reanimated and API.is_reanimated() end)
+    if ok and type(res) == "boolean" then isRe = res end
+    toggleBtn.Text = "Reanimate: " .. (isRe and "On" or "Off")
 end
 
---// Minimize behavior
-minimizeBtn.MouseButton1Click:Connect(function()
-	minimized = not minimized
-	reanimBtn.Visible = not minimized
-	frame.Size = minimized and UDim2.new(0, 400, 0, 50) or UDim2.new(0, 400, 0, 180)
-end)
+-- Toggle function
+local function toggleReanimate()
+    local isRe = false
+    local ok, res = pcall(function() return API.is_reanimated and API.is_reanimated() end)
+    if ok and type(res) == "boolean" then isRe = res end
 
---// Reanimate toggle
-reanimBtn.MouseButton1Click:Connect(function()
-	API = API or getReanimAPI()
-	if not API then
-		setStatus("⚠️ API not found")
-		return
-	end
-	local ok, result = pcall(function()
-		if API.is_reanimated and API.is_reanimated() then
-			API.reanimate(false)
-		else
-			API.reanimate(true)
-		end
-	end)
-	if not ok then
-		setStatus("Error: " .. tostring(result))
-	else
-		setStatus("Toggled reanimation")
-	end
-	updateButton()
-end)
-
---// GUI toggle key
-UIS.InputBegan:Connect(function(input, gp)
-	if gp then return end
-	if input.KeyCode == toggleKey then
-		guiVisible = not guiVisible
-		gui.Enabled = guiVisible
-	end
-end)
-
---// Initial check
-if API then
-	setStatus("✅ API Loaded")
-else
-	setStatus("⚠️ No Reanimation API found")
+    if not isRe then
+        setStatus("Attempting to reanimate...")
+        -- try to find a RemoteEvent in ReplicatedStorage named 'Reanimate' (optional)
+        local remote = nil
+        local args = nil
+        local ok2, res2 = pcall(function() return API.reanimate(true, remote, args) end)
+        if not ok2 then
+            setStatus("Reanimate failed: " .. tostring(res2), true)
+            warn("Reanimate error:", res2)
+        else
+            setStatus("Reanimated")
+        end
+    else
+        setStatus("Stopping reanimation...")
+        local ok2, res2 = pcall(function() return API.reanimate(false) end)
+        if not ok2 then
+            setStatus("Stop failed: " .. tostring(res2), true)
+            warn("Stop reanimate error:", res2)
+        else
+            setStatus("Restored real character")
+        end
+    end
+    refreshToggleLabel()
 end
 
-updateButton()
+toggleBtn.MouseButton1Click:Connect(toggleReanimate)
+
+-- Play animation
+playBtn.MouseButton1Click:Connect(function()
+    local url = tostring(urlBox.Text or "")
+    if url == "" then
+        setStatus("No URL provided", true)
+        return
+    end
+    local speed = tonumber(speedBox.Text) or 1.0
+    setStatus("Fetching & playing animation...")
+    local ok, res = pcall(function()
+        return API.play_animation(url, speed)
+    end)
+    if not ok then
+        setStatus("Play failed: " .. tostring(res), true)
+        warn("Play animation error:", res)
+    else
+        -- API.play_animation returns nothing on success — update UI
+        setStatus("Playing animation")
+    end
+    refreshToggleLabel()
+end)
+
+-- Stop animation
+stopBtn.MouseButton1Click:Connect(function()
+    local ok, res = pcall(function() return API.stop_animation() end)
+    if not ok then
+        setStatus("Stop animation error: " .. tostring(res), true)
+        warn("Stop animation error:", res)
+    else
+        setStatus("Animation stopped")
+    end
+end)
+
+-- Change speed live (applies if an animation is playing)
+speedBox.FocusLost:Connect(function(enterPressed)
+    local s = tonumber(speedBox.Text)
+    if s then
+        local ok, res = pcall(function() API.set_animation_speed(s) end)
+        if not ok then
+            setStatus("Speed change failed", true)
+            warn("set_animation_speed error:", res)
+        else
+            setStatus("Speed set to " .. tostring(s))
+        end
+    else
+        setStatus("Invalid speed value", true)
+    end
+end)
+
+-- Update UI when API callbacks fire (if available)
+if API.on_animation_play then
+    pcall(function()
+        API.on_animation_play(function(url)
+            setStatus("Playing: " .. tostring(url))
+        end)
+    end)
+end
+if API.on_animation_stop then
+    pcall(function()
+        API.on_animation_stop(function(url)
+            setStatus("Stopped: " .. tostring(url))
+        end)
+    end)
+end
+
+-- Hotkey: RightControl toggles reanimate
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.RightControl then
+        toggleReanimate()
+    end
+end)
+
+-- Keep UI toggle label updated every half second (to reflect external changes)
+spawn(function()
+    while true do
+        pcall(refreshToggleLabel)
+        wait(0.5)
+    end
+end)
+
+setStatus("Ready")
+
